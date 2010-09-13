@@ -48,6 +48,11 @@
 #include <vector>
 #include <map>
 #include <string>
+#ifdef __linux
+extern "C" {
+#include <bsd/stdlib.h>
+}
+#endif
 
 #include "board.h"
 

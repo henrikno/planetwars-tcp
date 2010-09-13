@@ -4,7 +4,7 @@ tcp: tcp.c
 	gcc -o tcp tcp.c
 
 server: server.o board.o
-	g++ -g -o server server.o board.o
+	g++ -g -o server server.o board.o -lbsd
 
 server.o: server.cpp board.h
 	g++ -c -g -o server.o server.cpp
