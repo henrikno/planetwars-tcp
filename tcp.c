@@ -45,6 +45,7 @@
 
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <netdb.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -56,24 +57,43 @@
 #include <unistd.h>
 
 static int
-tcp_connect(const char *host, unsigned port)
+tcp_connect(const char *host, const char *port)
 {
 	int fd;
-	struct sockaddr_in sa;
+	struct addrinfo hints;
+	struct addrinfo *res, *p;
+	//struct sockaddr_in sa;,
+	memset(&hints, 0, sizeof hints);
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_flags = AI_PASSIVE;
+	int status;
+	if ((status = getaddrinfo(host, port, &hints, &res)) != 0) {
+		printf("getaddrinfo error: %s\n", gai_strerror(status));
+		return (-1);
+	}
 
-	if ((fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-		printf("socket: %s\n", strerror(errno));
+	for(p = res; p != NULL; p = p->ai_next) {
+		if ((fd = socket(p->ai_family, p->ai_socktype,
+						p->ai_protocol)) == -1) {
+			perror("client: socket");
+			continue;
+		}
+
+		if (connect(fd, p->ai_addr, p->ai_addrlen) == -1) {
+			close(fd);
+			perror("client: connect");
+			continue;
+		}
+
+		break;
+	}
+	if (p == NULL) {
+		printf("client: failed to connect: %s\n", strerror(errno));
 		return (-1);
 	}
-	memset(&sa, 0, sizeof(sa));
-	sa.sin_family = AF_INET;
-	sa.sin_addr.s_addr = inet_addr(host);
-	sa.sin_port = htons(port);
-	if (connect(fd, (struct sockaddr *)&sa, sizeof(sa))) {
-		printf("connect: %s\n", strerror(errno));
-		close(fd);
-		return (-1);
-	}
+
+	freeaddrinfo(res);
 	return (fd);
 }
 
@@ -160,7 +180,7 @@ int main(int argc, char *argv[])
 		goto done;
 	}
 
-	if ((fd[0] = tcp_connect(argv[1], atoi(argv[2]))) < 0)
+	if ((fd[0] = tcp_connect(argv[1], argv[2])) < 0)
 		goto done;
 	if (password[0])
 		snprintf(buf, sizeof(buf), "USER %s PASS %s\n",
